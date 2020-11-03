@@ -57,7 +57,7 @@ class ChessWindow(QWidget):
                 self.playback = False
 
 
-    # render new chess.Board passed in
+    # render updated chess.Board
     def renderBoard(self):
         self.chessboardSvg = chess.svg.board(self.chessboard).encode("UTF-8")
         self.widgetSvg.load(self.chessboardSvg)
@@ -85,9 +85,9 @@ class ChessWindow(QWidget):
         return
 
     # load pgn and load moves list into class var
-    def loadPGN(self, file):
-        # pass in file string to open
-        pgn = open(file)
+    def loadPGN(self, filePath):
+        # pass in filePath string to open
+        pgn = open(filePath)
         game = chess.pgn.read_game(pgn)
         self.chessboard = game.board()
         for move in game.mainline_moves():
