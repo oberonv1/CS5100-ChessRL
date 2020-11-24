@@ -32,7 +32,8 @@ class ChessWindow(QWidget):
         # use Qtimer for playback animation
         self.animationTimer = QTimer(self)
         # frameInterval = ms until next playback frame
-        self.animationTimer.setInterval(frameInterval)
+        self.frameInterval = frameInterval
+        self.animationTimer.setInterval(self.frameInterval)
         self.animationTimer.timeout.connect(self.renderNextMove)
 
         # generate svg of chessboard 
@@ -64,7 +65,7 @@ class ChessWindow(QWidget):
         self.update()
         return
     
-    # render the board produced by prevMove passed in
+    # render the board with the last move in moves array
     def renderPreviousMove(self):
         if self.moveIndex == 0:
             print("No previous move exists.")
@@ -75,15 +76,19 @@ class ChessWindow(QWidget):
         return
 
     # render the board produced by nextMove passed in
-    def renderNextMove(self):
-        if self.moveIndex == len(self.moves):
-            print("No next move exists.")
-            return
-        self.chessboard.push(self.moves[self.moveIndex])
+    def renderNextMove(self, move=None):
+        if move != None:
+            self.chessboard.push(move)
+            self.moves.append(move)
+        else:
+            # if no move passed in, iterate through preloaded moves array
+            if self.moveIndex == len(self.moves):
+                print("No next move exists.")
+                return
+            self.chessboard.push(self.moves[self.moveIndex])
         self.moveIndex += 1
         self.renderBoard()
         return
-
     # load pgn and load moves list into class var
     def loadPGN(self, filePath):
         # pass in filePath string to open
@@ -96,6 +101,33 @@ class ChessWindow(QWidget):
 
     #Load a chessBoard object and add all of it's moves to the stack. 
     def loadChessBoard(self, chessBoard):
+        self.chessboard = chessBoard
+        self.moves = []
+        self.moveIndex = 0
         for move in chessBoard.move_stack:
             self.moves.append(move)
+        return
+    
+    def loadAI(self, agent, maxMoves=30):
+        self.agent = agent
+        self.maxMoves = maxMoves
+
+        # re-instantiate animationTimer to reconnect to new function, animateAI
+        self.animationTimer = QTimer(self)
+        self.animationTimer.setInterval(self.frameInterval)
+        self.animationTimer.timeout.connect(self.animateAI)
+        return
+
+    def animateAI(self):
+        if len(self.chessboard.move_stack) < self.maxMoves and not self.chessboard.is_game_over():
+            result = self.agent.getAction(self.chessboard)
+            if self.chessboard.turn == chess.WHITE:
+                print("White plays", result)
+            else: 
+                print("Black plays", result)
+            self.renderNextMove(result)
+        elif len(self.chessboard.move_stack) >= self.maxMoves:
+            print("Reached %s moves" % self.maxMoves)
+        elif self.chessboard.is_game_over():
+            print('Game over')
         return
