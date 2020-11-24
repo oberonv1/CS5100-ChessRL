@@ -93,3 +93,9 @@ class ChessWindow(QWidget):
         for move in game.mainline_moves():
             self.moves.append(move)
         return
+
+    #Load a chessBoard object and add all of it's moves to the stack. 
+    def loadChessBoard(self, chessBoard):
+        for move in chessBoard.move_stack:
+            self.moves.append(move)
+        return
