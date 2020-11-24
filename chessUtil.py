@@ -1,5 +1,8 @@
-openingBookPath = (r"C:/Users/xephy/OneDrive/Documents/Python Scripts/Sandbox/Chess_AI/"
-                   r"data/the-generated-opening-book.bin")
+
+
+openingBookPath = (r"C:/Users/xephy/OneDrive/Documents/Education/Classes/Northeastern/CS 5100/"
+                   r"Final Project/CS5100-ChessRL/data/the-generated-opening-book.bin")
+
 
 pawntable = [
  0,  0,  0,  0,  0,  0,  0,  0,
