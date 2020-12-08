@@ -14,6 +14,7 @@ class ChessWindow(QWidget):
 
         # set geometry of container window
         self.setGeometry(100, 100, 800, 800)
+        self.fileNum=0
 
         # set geometry of inner svg widget window
         self.widgetSvg = QSvgWidget(parent=self)
@@ -60,7 +61,12 @@ class ChessWindow(QWidget):
 
     # render updated chess.Board
     def renderBoard(self):
+        filename = "diagrams/chess_move_" + "%0.4i" % self.fileNum + ".svg"
+        f = open(filename, "wb")
         self.chessboardSvg = chess.svg.board(self.chessboard).encode("UTF-8")
+        f.write(self.chessboardSvg)
+        f.close()
+        self.fileNum += 1
         self.widgetSvg.load(self.chessboardSvg)
         self.update()
         return
