@@ -211,8 +211,11 @@ class AlphaBetaAgent():
     def eloTest(self):
         results = []
         for position in chessUtil.eloTestPositions:
+            print("\nPosition:", position)
             chessBoard = chess.Board(position)
-            results.append(self.getMove(chessBoard))
+            move = self.getMove(chessBoard)
+            print("Move: ", move)
+            results.append(move)
         
         return results
 

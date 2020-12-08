@@ -35,9 +35,9 @@ if __name__ == "__main__":
     #     window.loadPGN('data/Nakamura.pgn')
 
     print("Starting Test...")
-    agent = multiAgents.AlphaBetaAgent()
-    score = agent.bratkoKopecTest()
-    print("Score: ", score)
+    agent = multiAgents.AlphaBetaAgent(depth = 4)
+    results = agent.eloTest()
+    print("Results: ", results)
 
     window.show()
     app.exec()
