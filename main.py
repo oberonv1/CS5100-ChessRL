@@ -27,12 +27,17 @@ if __name__ == "__main__":
     app = QApplication(['Chess AI'])
     window = ChessWindow(args.frame_interval)
 
-    if args.filepath != None:
-        window.loadPGN(args.filepath)
-    elif args.live:
-        window.loadAI(multiAgents.AlphaBetaAgent(args.depth), maxMoves=args.max_moves)
-    else:
-        window.loadPGN('data/Nakamura.pgn')
+    # if args.filepath != None:
+    #     window.loadPGN(args.filepath)
+    # elif args.live:
+    #     window.loadAI(multiAgents.AlphaBetaAgent(args.depth), maxMoves=args.max_moves)
+    # else:
+    #     window.loadPGN('data/Nakamura.pgn')
+
+    print("Starting Test...")
+    agent = multiAgents.AlphaBetaAgent()
+    score = agent.bratkoKopecTest()
+    print("Score: ", score)
 
     window.show()
     app.exec()

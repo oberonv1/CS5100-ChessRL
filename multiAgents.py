@@ -16,42 +16,24 @@ import random, math, chess
 import chessUtil
 import chess.polyglot
 
-class Agent:
-    """
-    An agent must define a getAction method, but may also define the
-    following methods which will be called if they exist:
 
-    def registerInitialState(self, state): # inspects the starting state
-    """
-
-    def __init__(self):
-        pass
-
-    def getAction(self, state):
-        """
-        The Agent will receive a GameState (from either {pacman, capture, sonar}.py) and
-        must return an action from Directions.{North, South, East, West, Stop}
-        """
-        pass
-
-
-class MultiAgentSearchAgent(Agent):
-    """
-    This class provides some common elements to all of your
-    multi-agent searchers.  Any methods defined here will be available
-    to the MinimaxAgent, AlphaBetaAgent.
-    """
-
-    def __init__(self, depth = '2'):
-        self.depth = int(depth)
-
-
-class AlphaBetaAgent(MultiAgentSearchAgent):
+class AlphaBetaAgent():
     """
     Your minimax agent with alpha-beta pruning (question 3)
     """
 
-    def getAction(self, chessBoard):
+    def __init__(self, depth = '3'):
+        self.depth = int(depth)
+
+        """
+        Dictionary of moves
+        Keys are (Board Fen, and Turn)
+        Stored values are depth and best move result. 
+        """
+        self.transpositionTable = {}
+        self.eval = 0
+
+    def getMove(self, chessBoard):
         """
         Returns the minimax action from the current chessBoard using self.depth.
         """
@@ -61,6 +43,7 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         beta = math.inf
         bestEval = -math.inf
         bestMove = chess.Move.null()
+        self.initEvaluation(chessBoard)
 
         try:
             move = chess.polyglot.MemoryMappedReader(chessUtil.openingBookPath).weighted_choice(chessBoard).move()
@@ -68,16 +51,28 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
 
         except: 
             #Calculate the best move the chess engine should make
-            for move in chessBoard.legal_moves:
-                chessBoard.push(move)
-                eval = -1 * self.negaMax(chessBoard, self.depth, -beta, -alpha)
+            depth = self.depth
+           
+           #Check the transposition table
+            key = (chessBoard.board_fen(), chessBoard.turn)
+            if key in self.transpositionTable.keys():
+                potentialMove = self.transpositionTable[key]
+
+                #Check to ensure you aren't returning a move with lower search depth
+                if depth <= potentialMove[1]:
+                    return self.transpositionTable[key][0]
+
+            for move in getMoveOrdering(chessBoard):
+                self.pushMove(chessBoard, move)
+                eval = -1 * self.negaMax(chessBoard, depth, -beta, -alpha)
                 if eval > bestEval:
                     bestEval = eval
                     bestMove = move
                 if eval > alpha: 
                     alpha = eval
-                chessBoard.pop()
+                self.popMove(chessBoard)
 
+            self.transpositionTable[key] = (bestMove, depth)
             return bestMove
 
 
@@ -92,10 +87,10 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
 
         #Recursively search for best score and action! 
         bestEval = -math.inf
-        for move in chessBoard.legal_moves:
-            chessBoard.push(move)
+        for move in getMoveOrdering(chessBoard):
+            self.pushMove(chessBoard, move)
             nextEval = -1 * self.negaMax(chessBoard, depthRemaining - 1, -beta, -alpha)
-            chessBoard.pop()
+            self.popMove(chessBoard)
 
             if(nextEval >= beta):
                 return nextEval
@@ -106,7 +101,7 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
     
         return bestEval
 
-    def evaluationFunction(self, chessBoard):
+    def initEvaluation(self, chessBoard):
         """
         The evaluation function takes in the current chessBoard and move and returns an evaluation of the
         resulting position
@@ -115,20 +110,96 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         evaluation = materialEval(chessBoard)
         evaluation += sum(pieceSquareEval(chessBoard))
 
-        return evaluation
+        self.eval = evaluation
+
+    def quickEval(self, chessBoard):
+        evaluation = self.eval
+
+        if chessBoard.is_checkmate():
+            if chessBoard.turn:
+                return -9999
+            else:
+                return 9999
+        if chessBoard.is_stalemate():
+            return 0
+        if chessBoard.is_insufficient_material():
+            return 0
+
+        if chessBoard.turn:
+            return evaluation
+        else: 
+            return -evaluation
+
+    def incrementalEval(self, chessBoard, move, turn):
+        #update piecequares
+        movingPiece = chessBoard.piece_type_at(move.from_square)
+
+        if turn:
+            pieceSquareDiff = chessUtil.pieceTables[movingPiece][move.to_square] - \
+                              chessUtil.pieceTables[movingPiece][move.from_square] 
+            self.eval = self.eval + pieceSquareDiff
+            #update castling
+            if (move.from_square == chess.E1) and (move.to_square == chess.G1):
+                self.eval = self.eval - chessUtil.rookstable[chess.H1]
+                self.eval = self.eval + chessUtil.rookstable[chess.F1]
+            elif (move.from_square == chess.E1) and (move.to_square == chess.C1):
+                self.eval = self.eval - chessUtil.rookstable[chess.A1]
+                self.eval = self.eval + chessUtil.rookstable[chess.D1]
+        else:
+            pieceSquareDiff = chessUtil.pieceTables[movingPiece][move.to_square] - \
+                              chessUtil.pieceTables[movingPiece][move.from_square] 
+            self.eval = self.eval - pieceSquareDiff
+            #update castling
+            if (move.from_square == chess.E8) and (move.to_square == chess.G8):
+                self.eval = self.eval + chessUtil.rookstable[chess.H8]
+                self.eval = self.eval - chessUtil.rookstable[chess.F8]
+            elif (move.from_square == chess.E8) and (move.to_square == chess.C8):
+                self.eval = self.eval + chessUtil.rookstable[chess.A8]
+                self.eval = self.eval - chessUtil.rookstable[chess.D8]            
+        
+        #update material
+        if move.drop != None:
+            if turn:
+                self.eval = self.eval + chessUtil.pieceValue[move.drop]
+            else:
+                self.eval = self.eval - chessUtil.pieceValue[move.drop]
+                
+        #update promotion
+        if move.promotion != None:
+            if turn:
+                self.eval = self.eval + chessUtil.pieceValue[move.promotion]\
+                                      - chessUtil.pieceValue[movingPiece]
+                self.eval = self.eval - chessUtil.pieceTables[movingPiece][move.to_square]\
+                                      + chessUtil.pieceTables[move.promotion][move.to_square]
+            else:
+                self.eval = self.eval - chessUtil.pieceValue[move.promotion]\
+                                      + chessUtil.pieceValue[movingPiece]
+                self.eval = self.eval + chessUtil.pieceTables[movingPiece][move.to_square]\
+                                      - chessUtil.pieceTables[move.promotion][move.to_square]
+                
+    def pushMove(self, chessBoard, move):
+        self.incrementalEval(chessBoard, move, chessBoard.turn)
+        chessBoard.push(move)
+
+    def popMove(self, chessBoard):
+        move = chessBoard.pop()
+        self.incrementalEval(chessBoard, move, ~chessBoard.turn)
+
+        return move
+
 
     def quiesce(self, chessBoard, alpha, beta):
-        stand_pat = self.evaluationFunction(chessBoard)
+        stand_pat = self.quickEval(chessBoard)
         if( stand_pat >= beta ):
             return beta
         if( alpha < stand_pat ):
             alpha = stand_pat
 
-        for move in chessBoard.legal_moves:
+        for move in getMoveOrdering(chessBoard):
             if chessBoard.is_capture(move):
-                chessBoard.push(move)        
+                self.pushMove(chessBoard, move)   
                 score = -1 * self.quiesce(chessBoard, -beta, -alpha)
-                chessBoard.pop()
+                self.popMove(chessBoard)
 
                 if( score >= beta ):
                     return beta
@@ -136,20 +207,89 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
                     alpha = score  
         return alpha
 
+
+    def eloTest(self):
+        results = []
+        for position in chessUtil.eloTestPositions:
+            chessBoard = chess.Board(position)
+            results.append(self.getMove(chessBoard))
+        
+        return results
+
+    def bratkoKopecTest(self):
+        score = 0
+        for position, solution in zip(chessUtil.bratkoKopecPositions, chessUtil.bratkoKopecSolutions):
+            print("\nPosition:", position)
+            chessBoard = chess.Board(position)
+            move = self.getMove(chessBoard)
+            moveNotation = chessBoard.san(move)
+            print("Move: ", moveNotation)
+            print("Solution: ", solution)
+            if moveNotation == solution:
+                score += 1
+        
+        return score
+
+def getMoveOrdering(chessBoard):
+    """
+    This function returns to you a sorted list of legal moves by the following priorities: 
+    
+    Retakes - +100
+    Checks - +20 - ez
+    Captures - +10 - ez
+    Attacks - Valdiff (2x for pin)
+    Defensive considerations 
+    """
+    movelist =[]
+    moveScores = {}
+
+    for move in chessBoard.legal_moves:
+        movelist.append(move)
+        score = 0
+        #Consider Square Defense 
+        attDefDif = 0
+        #Defenders
+        for defenders in chessBoard.attackers(chessBoard.turn, move.to_square):
+            if chessBoard.piece_type_at(defenders) != None:
+                attDefDif += chessUtil.pieceValue[chessBoard.piece_type_at(defenders)]
+        #Attackers
+        for attackers in chessBoard.attackers(~chessBoard.turn, move.to_square):
+            if chessBoard.piece_type_at(attackers) != None:
+                attDefDif -= chessUtil.pieceValue[chessBoard.piece_type_at(attackers)]
+        score += attDefDif 
+
+        #Consider Checks 
+        if chessBoard.gives_check(move):
+            score += 20
+
+        #Consider Captures 
+        if chessBoard.is_capture(move):
+            score += 10
+
+        #Consider Pins and Attacks 
+        attackerVal = chessUtil.pieceValue[chessBoard.piece_type_at(move.from_square)]
+        chessBoard.push(move)
+        for attackedSquare in chessBoard.attacks(move.to_square):
+            if chessBoard.color_at(attackedSquare) == ~chessBoard.turn:
+                attackedVal = chessUtil.pieceValue[chessBoard.piece_type_at(attackedSquare)]
+                if chessBoard.is_pinned(~chessBoard.turn, attackedSquare):    
+                    score += 2 * (attackedVal - attackerVal)
+                else:
+                    score += attackedVal - attackerVal
+        chessBoard.pop()
+
+        moveScores[move] = score
+
+    #Sort Move Scores by score and return sorted list
+    orderedMoves = dict(sorted(moveScores.items(), key=lambda item: item[1], reverse = True))
+    
+    return list(orderedMoves.keys())
+
+
 def materialEval(chessBoard):
     """
     This default evaluation function just returns the score of the board based only on material advantage
-    """
-    if chessBoard.is_checkmate():
-        if chessBoard.turn:
-            return -9999
-        else:
-            return 9999
-    if chessBoard.is_stalemate():
-        return 0
-    if chessBoard.is_insufficient_material():
-        return 0
-    
+    """    
     wp = len(chessBoard.pieces(chess.PAWN, chess.WHITE)) 
     bp = len(chessBoard.pieces(chess.PAWN, chess.BLACK))
     wn = len(chessBoard.pieces(chess.KNIGHT, chess.WHITE))
@@ -163,10 +303,7 @@ def materialEval(chessBoard):
 
     materialEval = 100*(wp-bp) + 320*(wn-bn) + 330*(wb-bb) + 500*(wr-br) + 900*(wq-bq)
 
-    if chessBoard.turn == chess.WHITE:
-        return materialEval
-    else:
-        return -materialEval
+    return materialEval
 
 def pieceSquareEval(chessBoard):
     """

@@ -120,7 +120,7 @@ class ChessWindow(QWidget):
 
     def animateAI(self):
         if len(self.chessboard.move_stack) < self.maxMoves and not self.chessboard.is_game_over():
-            result = self.agent.getAction(self.chessboard)
+            result = self.agent.getMove(self.chessboard)
             if self.chessboard.turn == chess.WHITE:
                 print("White plays", result)
             else: 
